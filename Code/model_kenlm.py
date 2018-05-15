@@ -22,6 +22,7 @@ import math
 print('Loading models...')
 
 jieba.initialize()
+### [TODO] generate new list
 jieba.load_userdict("../data/list/words_newjieba.data")
 
 #bimodel_path = '../Model/zhwiki_bigram.klm'
@@ -59,7 +60,7 @@ else:
 
 total = sum(counter.values()) # Total number of characters in text
 
-# 形近字dictionary
+# similar shape characters1 dictionary
 xjz_dict_path = '../data/xjz.pkl'
 if os.path.exists(xjz_dict_path):
     xingjinzi = pickle.load(open(xjz_dict_path, 'rb'))
@@ -67,7 +68,16 @@ else:
     xingjinzi = {}
     pickle.dump(xingjinzi, open(xjz_dict_path, 'wb'))
 
-# 常见错误dictionary
+# similar shape characters2 dictionary
+sims_dict_path = '../data/sims.pickle' 
+if os.path.exists(sims_dict_path):
+    sims = pickle.load(open(sims_dict_path, 'rb'))
+    print('Loaded similar shape dict from file: {}'.format(sims_dict_path))
+else:
+    sims = {}
+    pickle.dump(sims, open(sims_dict_path, 'wb'))
+
+# common error dictionary
 common_dict_path = '../data/common.pkl'#../data/
 if os.path.exists(common_dict_path):
     common = pickle.load(open(common_dict_path, 'rb'))
@@ -76,17 +86,8 @@ else:
     pickle.dump(common, open(common_dict_path, 'wb'))
 common_mistakes = common.keys()
 
-# 加载形近字dictionary
-sims_dict_path = '../data/sims.pickle' # Path of similar shape characters dict
-if os.path.exists(sims_dict_path):
-    sims = pickle.load(open(sims_dict_path, 'rb'))
-    print('Loaded similar shape dict from file: {}'.format(sims_dict_path))
-else:
-    sims = {}
-    pickle.dump(sims, open(sims_dict_path, 'wb'))
-
-# 加载音近字dictionary
-simp_dict_path = '../data/simp_simplified.pickle' # Path of similar pronunciation characters dict
+# similar pronunciation dictionary
+simp_dict_path = '../data/simp_simplified.pickle'
 if os.path.exists(simp_dict_path):
     simp = pickle.load(open(simp_dict_path, 'rb'))
     print('Loaded similar pronunciation dict from file: {}'.format(simp_dict_path))
@@ -94,6 +95,24 @@ else:
     simp = {}
     pickle.dump(simp, open(simp_dict_path, 'wb'))
 
+print("Loading self-build word list...")
+freq_file = '../data/token_freq_pos_jieba.txt'
+word_freq = {}
+with open(freq_file, 'r') as f:
+    for line in f:
+        info = line.split()
+        word = info[0]
+        frequency = info[1]
+        word_freq[word] = frequency
+print(len(word_freq))
+
+print("Loading Chinese dictionary...")
+cn_dict_file = '../data/cn_dict.txt'
+cn_dict = ""
+with open(cn_dict_file, 'r') as f:
+    for word in f:
+        cn_dict += word.strip()
+print(len(cn_dict))
 
 print('Models loaded.')
 
@@ -237,6 +256,8 @@ def score_sentence(ss):
     # average score for each character in the sentence
     per_word_scores = list(np.average(np.array(havg_scores), axis=0)) 
 
+
+    ### [TODO] detect outlier here
     outindices, _ = mad_based_outlier(np.array(list(per_word_scores)), threshold=1.2)
     if outindices:
         outranges = merge_ranges([[outindex, outindex+1] for outindex in outindices])
@@ -253,7 +274,7 @@ def score_sentence(ss):
 #                                                                                       #
 #########################################################################################
 
-def prepare_freq_list(inpath='../data/dict/token_freq_pos_jieba.txt'):
+def prepare_freq_list(inpath):
     '''
     construct self dict with data
     '''
@@ -266,7 +287,7 @@ def prepare_freq_list(inpath='../data/dict/token_freq_pos_jieba.txt'):
             word_freq[word] = frequency
         return word_freq
 
-def prepare_dict(inpath='../data/dict/cn_dict.txt'):
+def prepare_dict(inpath):
     '''
     use the word in this dict to replace the words in given phrases
     '''
@@ -298,7 +319,7 @@ def is_in_dict(phrases, word_freq):
     '''
     Judge if the phrase in phrases list are noticed in the given dictionary word_freq
     '''
-    return set(phrase for phrase in phrases if phrase.encode("utf-8") in word_freq)
+    return set(phrase for phrase in phrases if phrase in word_freq)
 
 def get_candidate(phrase, cn_dict, word_freq):
     '''
@@ -312,7 +333,6 @@ def get_candidate(phrase, cn_dict, word_freq):
     input_pinyin = pinyin.get(phrase, format="strip", delimiter = "/")
     all_candidates_set = edits_dis_1(phrase, cn_dict)
     candidates = list(is_in_dict(all_candidates_set, word_freq))
-    
     for candidate in candidates:
         candidate_pinyin = pinyin.get(candidate, format="strip", delimiter = "/")
         if candidate_pinyin == input_pinyin:
@@ -325,6 +345,9 @@ def get_candidate(phrase, cn_dict, word_freq):
 def auto_correct( error_phrase, cn_dict, word_freq ):
         
     c1_order, c2_order = get_candidate(error_phrase, cn_dict, word_freq)
+    if error_phrase is "高心":
+        print(c1_order)
+        print(c2_order)
     ##print c1_order, c2_order, c3_order
     if c1_order:
         return max(c1_order, key=word_freq.get )
@@ -356,13 +379,23 @@ def get_xingjinzi(in_char):
 def get_simpronunciation(in_char):
     return simp.get(in_char, set())
 
+def get_simshape(in_char):
+    return sims.get(in_char, set())
+
+def get_commonerror(in_char):
+    return common.get(in_char, set())
+
 def gen_chars(in_char, frac=2):
     # Get confusion characters of in_char from the confusion sets
     # frac: get top 1/frac in terms of character frequency
     chars_set = get_simpronunciation(in_char).union(get_xingjinzi(in_char))
+    chars_set = chars_set.union(get_simshape(in_char))
+    chars_set = chars_set.union(get_commonerror(in_char))
+
     if not chars_set:
         chars_set = {in_char}
     chars_set.add(in_char)
+
     chars_list = list(chars_set)
     return sorted(chars_list, key=lambda k: getf(k), reverse=True)[:len(chars_list)//frac+1]
 
@@ -372,8 +405,8 @@ def correct_ngram_2(ss, st, en):
     mingram = ss[st:en]
     for i, m in enumerate(mingram):
         mc = gen_chars(m) # Possible corrections for character m in mingram
-        print('Number of possible replacements for {} is {}'.format(m, len(mc)))
-        print(mc)
+        #print('Number of possible replacements for {} is {}'.format(m, len(mc)))
+        #print(mc)
         mg = max(mc, key=lambda k: get_wordmodel_score(ss[:st] + mingram[:i] + k + mingram[i+1:] + ss[en:]) + math.log(5)**(k == m))
         mingram = mingram[:i] + mg + mingram[i+1:]
     return mingram
@@ -382,11 +415,6 @@ def correct(ss):
     '''
     Correct sentence ss
     '''
-    freq_file = '../data/dict/token_freq_pos_jieba.txt'
-    word_freq = prepare_freq_list(freq_file)
-    cn_dict_file = '../data/dict/cn_dict.txt'
-    cn_dict = prepare_dict(cn_dict_file)
-
     # Returns list of tuples (word, st, en)  mode='search'
     tokens = list(jieba.tokenize(ss))
     print('Segmented sentence is {}'.format(''.join([str(token) for token in tokens])))
@@ -406,8 +434,9 @@ def correct(ss):
             # cgram = ""
             # for error in errors:
             cgram = auto_correct(possible_wrong, cn_dict, word_freq)
-            ss = ss[:st] + cgram + ss[en:]
+            #ss = ss[:st] + cgram + ss[en:]
             print('Corrected ngram 1 is {}'.format(cgram))
+
             cgram2 = correct_ngram_2(ss, st, en)
             print('Corrected ngram 2 is {}'.format(cgram2))
             ss = ss[:st] + cgram2 + ss[en:]
@@ -416,6 +445,9 @@ def correct(ss):
         print('No ngram to correct.')
     return ss, correct_ranges
 
+def jieba_cut(ss):
+    seg_list = jieba.cut(ss, HMM=True)
+    return " ".join(seg_list)
 
 #########################################################################################
 #                                                                                       #
@@ -451,6 +483,38 @@ def main():
     print('Number of detected errors is {}'.format(detected_errors)) # Number of errors correctly detected by the algorithm
     print('Number of reported errors is {}'.format(reported_errors)) # Total number of errors reported by the algorithm
 
-
+def main1():
+    # Load data
+    processed_file = '../data/10_preprocessed_space'
+    with open(processed_file, 'r') as f:
+        dataset = f.readlines()
+    print(len(dataset))
+    # dataset = pickle.load(codecs.open(processed_file, 'rb')) # Loads a list of tuples: [(PASSAGE, [(location, wrong, correction)])]
+    total_errors = 0
+    reported_errors = 0
+    detected_errors = 0
+    for sentence in dataset:
+        # Error detection
+        print('The sentence is {}'.format(sentence))
+        jieba_ss = jieba_cut(''.join(sentence.split()))
+        print('Apply Jieba cut: {}'.format(jieba_ss))
+        ss_seg = jieba_cut(jieba_ss).split(' ')
+        print(ss_seg)
+        # Error correction
+        corrected_ss, correct_ranges = correct(sentence)
+        reported_errors += len(correct_ranges)
+        print('Corrected sentence is {}'.format(corrected_ss))
+        # Reference
+        # for spelling_error in spelling_errors:
+        #     total_errors += 1
+        #     location, wrong, correction = spelling_error
+        #     print('{} at {} should be {}'.format(wrong, location, correction))
+        #     for correct_range in correct_ranges:
+        #         if location >= correct_range[0] and location < correct_range[1]:
+        #             detected_errors += 1
+        print('-------------------------------------------------------------------------------------')
+    #print('Number of total errors is {}'.format(total_errors)) 
+    #print('Number of detected errors is {}'.format(detected_errors)) 
+    print('Number of reported errors is {}'.format(reported_errors)) 
 if __name__=='__main__':
-    main()
+    main1()
