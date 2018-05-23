@@ -26,22 +26,26 @@ jieba.initialize()
 jieba.load_userdict("../data/list/words_newjieba.data")
 
 #bimodel_path = '../Model/zhwiki_bigram.klm'
-bimodel_path = '../Model/final-2gram.arpa'
+#bimodel_path = '../Model/final-2gram.arpa'
+bimodel_path = '../Model/finalbaidu_2gram.arpa'
 bimodel = kenlm.Model(bimodel_path)
 print('Loaded bigram language model from {}'.format(bimodel_path))
 
 #trimodel_path = '../Model/zhwiki_trigram.klm'
-trimodel_path = '../Model/final-3gram.arpa'
+#trimodel_path = '../Model/final-3gram.arpa'
+trimodel_path = '../Model/finalbaidu_3gram.arpa'
 trimodel = kenlm.Model(trimodel_path)
 print('Loaded trigram language model from {}'.format(trimodel_path))
 
 #_4model_path = '../Model/zhwiki_4gram.arpa'
-_4model_path = '../Model/final-4gram.arpa'
+#_4model_path = '../Model/final-4gram.arpa'
+_4model_path = '../Model/finalbaidu_4gram.arpa'
 _4model = kenlm.Model(_4model_path)
 print('Loaded 4-gram language model from {}'.format(_4model_path))
 
 #wordmodel_path = '../Model/zhwiki_word_bigram.arpa'
-wordmodel_path = '../Model/final-word-bigram.arpa'
+#wordmodel_path = '../Model/final-word-bigram.arpa'
+wordmodel_path = '../Model/finalbaidu_word_2gram.arpa'
 wordmodel = kenlm.Model(wordmodel_path)
 print('Loaded word-level bigram language model from {}'.format(wordmodel_path))
 
@@ -97,6 +101,7 @@ else:
 
 print("Loading self-build word list...")
 freq_file = '../data/token_freq_pos_jieba.txt'
+new_file = '../data/list/words_newjieba.data'
 word_freq = {}
 with open(freq_file, 'r') as f:
     for line in f:
@@ -104,6 +109,13 @@ with open(freq_file, 'r') as f:
         word = info[0]
         frequency = info[1]
         word_freq[word] = frequency
+
+with open(new_file, 'r') as nf:
+    for line in nf:
+        info = line.split()
+        word = info[0]
+        frequency = info[1]
+        word_freq[word] = str(int(word_freq.get(word, 0)) + int(frequency))
 print(len(word_freq))
 
 print("Loading Chinese dictionary...")
@@ -258,7 +270,7 @@ def score_sentence(ss):
 
 
     ### [TODO] detect outlier here
-    outindices, _ = mad_based_outlier(np.array(list(per_word_scores)), threshold=1.2)
+    outindices, _ = mad_based_outlier(np.array(list(per_word_scores)), threshold=1.5)
     if outindices:
         outranges = merge_ranges([[outindex, outindex+1] for outindex in outindices])
         print('outranges are {}'.format(outranges))
@@ -305,15 +317,31 @@ def edits_dis_1(phrase, cn_dict):
     phrase = phrase#.decode('utf-8')
     splits     = [(phrase[:i], phrase[i:])  for i in range(len(phrase) + 1)]
     #print "splits:", [split.encode('utf-8') for split in splits]
-    deletes    = [L + R[1:]                 for L, R in splits if R]
+    #deletes    = [L + R[1:]                 for L, R in splits if R]
     #print "deletes:", [delete for delete in deletes]
     transposes = [L + R[1] + R[0] + R[2:]   for L, R in splits if len(R)>1]
     #print "transposes:", transposes
     replaces   = [L + c + R[1:]             for L, R in splits if R for c in cn_dict]
     #print "replaces:", replaces
-    inserts    = [L + c + R                 for L, R in splits for c in cn_dict]
+    #inserts    = [L + c + R                 for L, R in splits for c in cn_dict]
     #print "inserts:", inserts
-    return set(deletes + transposes + replaces + inserts)
+    #return set(deletes + transposes + replaces + inserts)
+    return set(transposes + replaces)
+
+
+def get_edit_dis(s1, s2):
+    if len(s1) > len(s2):
+        s1, s2 = s2, s1
+    distances = range(len(s1) + 1)
+    for i2, c2 in enumerate(s2):
+        distances_ = [i2+1]
+        for i1, c1 in enumerate(s1):
+            if c1 == c2:
+                distances_.append(distances[i1])
+            else:
+                distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
+        distances = distances_
+    return distances[-1]
 
 def is_in_dict(phrases, word_freq):
     '''
@@ -337,7 +365,7 @@ def get_candidate(phrase, cn_dict, word_freq):
         candidate_pinyin = pinyin.get(candidate, format="strip", delimiter = "/")
         if candidate_pinyin == input_pinyin:
             candidates_1.append(candidate)
-        else:
+        elif get_edit_dis(input_pinyin, candidate_pinyin) <= 3:
             candidates_2.append(candidate)
 
     return candidates_1, candidates_2
@@ -345,9 +373,6 @@ def get_candidate(phrase, cn_dict, word_freq):
 def auto_correct( error_phrase, cn_dict, word_freq ):
         
     c1_order, c2_order = get_candidate(error_phrase, cn_dict, word_freq)
-    if error_phrase is "高心":
-        print(c1_order)
-        print(c2_order)
     ##print c1_order, c2_order, c3_order
     if c1_order:
         return max(c1_order, key=word_freq.get )
@@ -405,6 +430,7 @@ def correct_ngram_2(ss, st, en):
     mingram = ss[st:en]
     for i, m in enumerate(mingram):
         mc = gen_chars(m) # Possible corrections for character m in mingram
+        
         #print('Number of possible replacements for {} is {}'.format(m, len(mc)))
         #print(mc)
         mg = max(mc, key=lambda k: get_wordmodel_score(ss[:st] + mingram[:i] + k + mingram[i+1:] + ss[en:]) + math.log(5)**(k == m))
@@ -426,7 +452,7 @@ def correct(ss):
         for correct_range in correct_ranges:
             print('Correct range is {}'.format(correct_range))
             st, en = correct_range
-            print('Possible wrong ngram is {}'.format(ss[st:en]))
+            print('Possible wrong segment is {}'.format(ss[st:en]))
             possible_wrong = ss[st:en]
             # seg_list = jieba.cut(possible_wrong)
             # error_string = ", ".join(seg_list)
@@ -434,15 +460,15 @@ def correct(ss):
             # cgram = ""
             # for error in errors:
             cgram = auto_correct(possible_wrong, cn_dict, word_freq)
-            #ss = ss[:st] + cgram + ss[en:]
-            print('Corrected ngram 1 is {}'.format(cgram))
+            ss = ss[:st] + cgram + ss[en:]
+            print('Corrected pinyin is {}'.format(cgram))
 
             cgram2 = correct_ngram_2(ss, st, en)
-            print('Corrected ngram 2 is {}'.format(cgram2))
+            print('Corrected ngram is {}'.format(cgram2))
             ss = ss[:st] + cgram2 + ss[en:]
     else:
         correct_ranges = []
-        print('No ngram to correct.')
+        print('No segment to correct.')
     return ss, correct_ranges
 
 def jieba_cut(ss):
@@ -497,9 +523,9 @@ def main1():
         # Error detection
         print('The sentence is {}'.format(sentence))
         jieba_ss = jieba_cut(''.join(sentence.split()))
-        print('Apply Jieba cut: {}'.format(jieba_ss))
-        ss_seg = jieba_cut(jieba_ss).split(' ')
-        print(ss_seg)
+        #print('Apply Jieba cut: {}'.format(jieba_ss))
+        #ss_seg = jieba_cut(jieba_ss).split(' ')
+        #print(ss_seg)
         # Error correction
         corrected_ss, correct_ranges = correct(sentence)
         reported_errors += len(correct_ranges)
@@ -517,4 +543,4 @@ def main1():
     #print('Number of detected errors is {}'.format(detected_errors)) 
     print('Number of reported errors is {}'.format(reported_errors)) 
 if __name__=='__main__':
-    main1()
+    main()

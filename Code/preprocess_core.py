@@ -136,6 +136,7 @@ def join_space(string):
     #TODO1: join multiple space
     string = ' '.join(string.split())
     return string
+    
 def join_space_file(inpath, outpath):
     with open(inpath, 'r') as f:
         txt = f.readlines()              
@@ -143,6 +144,16 @@ def join_space_file(inpath, outpath):
     for c in txt:
         newline = ''.join(join_space(c))
         print (newline)
+
+def handle_5gram(inpath, outpath):
+    numeric_const_pattern = "[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?"
+    with open(inpath, 'r') as f:
+        txt = f.readlines()
+    sys.stdout = open(outpath, 'wt')
+    for c in txt:  
+        one_str = re.sub(numeric_const_pattern, ' ', c)
+        one_str = ''.join(one_str.split())
+        print (one_str)
 
 if __name__ == '__main__':
     inpath = '../data/2_preprocessed'
@@ -154,13 +165,31 @@ if __name__ == '__main__':
     outpath7 = '../data/7_preprocessed_english'
     path8 = '../data/8_clean_flag'
     outpath8 = '../data/8_preprocessed_flag'
+    outpath88 = '../data/8_preprocessed_flag_space'
     outpath9 = '../data/9_preprocessed_punc'
     outpath10 = '../data/10_preprocessed_space'
 
     #test = "关于《国家税务总局关于水资源费改税 后城镇公共供水企业增值税发票开具问题的公告 》的解读 根据《财政部 税务总局 水利部关于印发<扩大水资源税改革试点实施办法>的通知》（ 财税〔 〕 号），自 年 月 日起在北京、天津、山西、内蒙古、山东、河南、四川、陕西、宁夏 个省份..."
-    #join_space_file(outpath9, outpath10)
+    #join_space_file(outpath8, outpath88)
 
-
+    fiveg = '../data/weibo_5gram.data'
+    outpathg = '../data/weibo_segment.data'
+    handle_5gram(fiveg, outpathg)
+    # s = "🇩🇪-9223330358968196918#1516422278 消防车🚒//@app菌:哈哈哈哈哈哈哈哈 谈个恋爱还不够生气的//@一个阿呆仔:学猪叫那个真笑出猪声[允悲]//@梨 园西池水: 哈哈哈哈哈哈哈哈哈哈//@太皇太后您有喜啦:哈哈哈哈哈哈哈哈哈怎么这么好笑ˊ_>ˋ"
+    # print(s)
+    # s = escape_emoji(s)
+    # print(s)
+    # s = escape_en_char(s)
+    # print(s)
+    # s = CHINESE_SYMBOLS_AND_PUNCTUATION.remove(s)
+    # print(s)
+    # s = SYMBOLS_AND_PUNCTUATION_EXTENSION.remove(s)
+    # s = GENERAL_PUNCTUATION.remove(s)
+    # print(s)
+    # s = escape_flag(s)
+    # print(s)
+    # s = join_space(s)
+    # print(s)
 
 
 

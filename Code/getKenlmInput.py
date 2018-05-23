@@ -23,9 +23,10 @@ def get_words(inpath, outpath):
     
     outfile = open(outpath, 'w')
     for d in data:
-    	seg_list = jieba.cut(d)
-    	word = ' '.join(seg_list)
-        print word
+        seg_list = jieba.cut(d)
+        word = ' '.join(seg_list)
+        word = ' '.join(word.split())
+        #print word
         info = word.encode('utf-8')
         print >> outfile, info
     
@@ -35,13 +36,15 @@ def get_chars(inpath, outpath):
     
     outfile = open(outpath, 'w')
     for d in data:
-    	word = ' '.join(d.decode('utf-8'))
-        print word
+        word = ' '.join(d.decode('utf-8'))
+        word = ' '.join(word.split())
+        #print word
         info = word.encode('utf-8')
         print >> outfile, info
 
 if __name__ == '__main__':
-    inpath = 'data/input-math.txt'
-    outpath = 'data/output-wordmath.txt'
-    print "a"
-    get_words(inpath, outpath)
+    inpath = '../data/finally.txt'
+    outpath = '../data/finalbaidu_with_space'
+    outpath1 = '../data/finalbaidu_with_jieba'
+    get_chars(inpath, outpath)
+    get_words(inpath, outpath1)

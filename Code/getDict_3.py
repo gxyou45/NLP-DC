@@ -9,7 +9,6 @@ import re
 import pandas
 #from opencc import OpenCC
 import emoji
-import regex
 import jieba
 from collections import Counter
 
@@ -163,14 +162,6 @@ def extract_emojis(s):
     r = re.compile('|'.join(re.escape(p) for p in emojis_list))
     print(' '.join(re.findall(s)))
 
-def split_count(text):
-    emoji_list = []
-    data = regex.findall(r'\X', text)
-    for word in data:
-        if any(char in emoji.UNICODE_EMOJI for char in word):
-            emoji_list.append(word)
-    return emoji_list
-
 if __name__ == '__main__':
     inpath = 'data/chinese_word_correction_data.json'
     path1 = 'data/1_out'
@@ -189,10 +180,12 @@ if __name__ == '__main__':
     # step4: count the frequency
     #filter_emoji(path5, path6)
     #filter_emoji(path5,path6)
-    a = '🤔 🙈 me así,bla es,se 😌 ds 💕👭👙'
-    counter = split_count(a)
-    print(' '.join(emoji for emoji in counter))
-    
+    emojis_list = map(lambda x: ''.join(x.split()), emoji.UNICODE_EMOJI.keys())
+    a_list=''.join('🤔 🙈 me así,bla es,se 😌 ds 💕👭👙')
+    print a_list
+    for d in a_list:
+        if d.encode in emojis_list: 
+            print d
     # DEMO -- to check how it looks like 
     # use it as below
     #lines = get_lines(path4)
