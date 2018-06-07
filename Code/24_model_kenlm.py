@@ -259,8 +259,6 @@ def score_sentence(ss):
 
         # Pad the scores list for moving window average
         for _ in range(k-1): 
-            if len(scores) == 0:
-                return None, None, []
             scores.insert(0, scores[0])
             scores.append(scores[-1])
 
@@ -534,4 +532,4 @@ def main1():
         print('-------------------------------------------------------------------------------------')
     print('Number of reported errors is {}'.format(reported_errors)) 
 if __name__=='__main__':
-    main()
+    main1()
